@@ -10,8 +10,10 @@ asyncio==3.4.3
 beautifulsoup4==4.12.3
 lxml==5.3.0
 
-# Database and caching
-psycopg2-binary==2.9.9
+# Database - psycopg3 for Python 3.13 compatibility
+psycopg[binary]==3.2.3
+
+# Caching
 redis==5.0.1
 
 # Utilities
