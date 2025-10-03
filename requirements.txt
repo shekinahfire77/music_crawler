@@ -6,8 +6,8 @@ aiohttp==3.9.1
 aiofiles==23.2.1
 asyncio==3.4.3
 
-# HTML parsing (lightweight)
-selectolax==0.3.16
+# HTML parsing (lightweight) - upgraded for Python 3.13
+selectolax==0.3.21
 
 # Database and caching
 psycopg2-binary==2.9.9
