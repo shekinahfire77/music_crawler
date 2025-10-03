@@ -1,0 +1,33 @@
+# Production-Grade Web Crawler for Render
+# Resource constraints: 0.5 vCPU, 512MB RAM
+
+# Core dependencies
+aiohttp==3.9.1
+aiofiles==23.2.1
+asyncio==3.4.3
+
+# HTML parsing (lightweight)
+selectolax==0.3.16
+
+# Database and caching
+psycopg2-binary==2.9.9
+redis==5.0.1
+
+# Utilities
+pyyaml==6.0.1
+psutil==5.9.6
+
+# URL parsing and robots.txt
+urllib3==2.1.0
+
+# Logging and monitoring
+python-json-logger==2.0.7
+
+# Environment and configuration
+python-dotenv==1.0.0
+
+# Production server (for health checks)
+gunicorn==21.2.0
+
+# CSV export
+pandas==2.1.4
