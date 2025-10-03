@@ -1,11 +1,10 @@
-
 #!/usr/bin/env python3
 """
 Content extraction and parsing utilities
 Optimized for music-related websites
 """
 
-from selectolax.parser import HTMLParser
+from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urldefrag
 from datetime import datetime
 import logging
@@ -13,18 +12,18 @@ import re
 from typing import List, Dict, Optional
 
 class ContentExtractor:
-    """Extract and parse content from HTML using selectolax for speed"""
+    """Extract and parse content from HTML using BeautifulSoup"""
 
     @staticmethod
     def extract_links(html: str, base_url: str) -> List[str]:
-        """Extract links from HTML using selectolax"""
+        """Extract links from HTML using BeautifulSoup"""
         try:
-            tree = HTMLParser(html)
+            soup = BeautifulSoup(html, 'lxml')
             links = []
 
             # Extract from <a href> tags
-            for link in tree.css('a[href]'):
-                href = link.attributes.get('href')
+            for link in soup.select('a[href]'):
+                href = link.get('href')
                 if href:
                     # Resolve relative URLs
                     full_url = urljoin(base_url, href)
@@ -35,9 +34,9 @@ class ContentExtractor:
 
             # Also check for links in sitemap files
             if 'sitemap' in base_url.lower():
-                for loc in tree.css('loc'):
-                    if loc.text():
-                        links.append(loc.text().strip())
+                for loc in soup.select('loc'):
+                    if loc.get_text():
+                        links.append(loc.get_text().strip())
 
             return list(set(links))  # Remove duplicates
 
@@ -49,34 +48,34 @@ class ContentExtractor:
     def extract_content(html: str, url: str) -> Dict:
         """Extract structured content from HTML"""
         try:
-            tree = HTMLParser(html)
+            soup = BeautifulSoup(html, 'lxml')
 
             # Basic content extraction
             title = ""
-            title_tag = tree.css_first('title')
+            title_tag = soup.select_one('title')
             if title_tag:
-                title = title_tag.text(strip=True)
+                title = title_tag.get_text(strip=True)
 
             # Extract meta description
             meta_description = ""
-            meta_tag = tree.css_first('meta[name="description"]')
+            meta_tag = soup.select_one('meta[name="description"]')
             if meta_tag:
-                meta_description = meta_tag.attributes.get('content', '')
+                meta_description = meta_tag.get('content', '')
 
             # Extract meta keywords
             meta_keywords = ""
-            keywords_tag = tree.css_first('meta[name="keywords"]')
+            keywords_tag = soup.select_one('meta[name="keywords"]')
             if keywords_tag:
-                meta_keywords = keywords_tag.attributes.get('content', '')
+                meta_keywords = keywords_tag.get('content', '')
 
             # Extract main content text (limited to save memory)
-            text_content = ContentExtractor._extract_text_content(tree)
+            text_content = ContentExtractor._extract_text_content(soup)
 
             # Music-specific extraction
-            music_data = ContentExtractor._extract_music_data(tree, url)
+            music_data = ContentExtractor._extract_music_data(soup, url)
 
             # Extract structured data (JSON-LD, microdata)
-            structured_data = ContentExtractor._extract_structured_data(tree)
+            structured_data = ContentExtractor._extract_structured_data(soup)
 
             return {
                 'title': title[:500] if title else "",  # Limit length
@@ -98,10 +97,10 @@ class ContentExtractor:
             }
 
     @staticmethod
-    def _extract_text_content(tree: HTMLParser) -> str:
+    def _extract_text_content(soup: BeautifulSoup) -> str:
         """Extract main text content, limited to save memory"""
         # Remove script and style elements
-        for element in tree.css('script, style, nav, footer, header'):
+        for element in soup.select('script, style, nav, footer, header'):
             element.decompose()
 
         # Extract text from main content areas
@@ -112,22 +111,22 @@ class ContentExtractor:
 
         text_content = ""
         for selector in main_selectors:
-            main_element = tree.css_first(selector)
+            main_element = soup.select_one(selector)
             if main_element:
-                text_content = main_element.text(strip=True)
+                text_content = main_element.get_text(strip=True)
                 break
 
         # Fallback to body if no main content found
         if not text_content:
-            body = tree.css_first('body')
+            body = soup.select_one('body')
             if body:
-                text_content = body.text(strip=True)
+                text_content = body.get_text(strip=True)
 
         # Limit text length to save memory
         return text_content[:1000] if text_content else ""
 
     @staticmethod
-    def _extract_music_data(tree: HTMLParser, url: str) -> Dict:
+    def _extract_music_data(soup: BeautifulSoup, url: str) -> Dict:
         """Extract music-specific data based on domain"""
         parsed_url = urlparse(url)
         domain = parsed_url.netloc.lower()
@@ -136,24 +135,24 @@ class ContentExtractor:
 
         try:
             if 'ultimate-guitar' in domain:
-                music_data.update(ContentExtractor._extract_ultimate_guitar(tree))
+                music_data.update(ContentExtractor._extract_ultimate_guitar(soup))
             elif 'bandcamp' in domain:
-                music_data.update(ContentExtractor._extract_bandcamp(tree))
+                music_data.update(ContentExtractor._extract_bandcamp(soup))
             elif 'last.fm' in domain:
-                music_data.update(ContentExtractor._extract_lastfm(tree))
+                music_data.update(ContentExtractor._extract_lastfm(soup))
             elif 'discogs' in domain:
-                music_data.update(ContentExtractor._extract_discogs(tree))
+                music_data.update(ContentExtractor._extract_discogs(soup))
             elif 'soundcloud' in domain:
-                music_data.update(ContentExtractor._extract_soundcloud(tree))
+                music_data.update(ContentExtractor._extract_soundcloud(soup))
             elif 'musicbrainz' in domain:
-                music_data.update(ContentExtractor._extract_musicbrainz(tree))
+                music_data.update(ContentExtractor._extract_musicbrainz(soup))
             elif 'pitchfork' in domain:
-                music_data.update(ContentExtractor._extract_pitchfork(tree))
+                music_data.update(ContentExtractor._extract_pitchfork(soup))
             elif 'allmusic' in domain:
-                music_data.update(ContentExtractor._extract_allmusic(tree))
+                music_data.update(ContentExtractor._extract_allmusic(soup))
 
             # Generic music-related content extraction
-            music_data.update(ContentExtractor._extract_generic_music(tree))
+            music_data.update(ContentExtractor._extract_generic_music(soup))
 
         except Exception as e:
             logging.debug(f"Music data extraction failed for {domain}: {e}")
@@ -161,104 +160,107 @@ class ContentExtractor:
         return music_data
 
     @staticmethod
-    def _extract_ultimate_guitar(tree: HTMLParser) -> Dict:
+    def _extract_ultimate_guitar(soup: BeautifulSoup) -> Dict:
         """Extract Ultimate Guitar specific data"""
         data = {}
 
         # Song and artist info
-        song_title = tree.css_first('.t_title, [data-song-title]')
+        song_title = soup.select_one('.t_title, [data-song-title]')
         if song_title:
-            data['song_title'] = song_title.text(strip=True)
+            data['song_title'] = song_title.get_text(strip=True)
 
-        artist = tree.css_first('.t_artist, [data-artist-name]')
+        artist = soup.select_one('.t_artist, [data-artist-name]')
         if artist:
-            data['artist'] = artist.text(strip=True)
+            data['artist'] = artist.get_text(strip=True)
 
         # Tab/chord type
-        tab_type = tree.css_first('.js-tab-type')
+        tab_type = soup.select_one('.js-tab-type')
         if tab_type:
-            data['tab_type'] = tab_type.text(strip=True)
+            data['tab_type'] = tab_type.get_text(strip=True)
 
         # Rating
-        rating = tree.css_first('.rating, .js-rating')
+        rating = soup.select_one('.rating, .js-rating')
         if rating:
-            data['rating'] = rating.text(strip=True)
+            data['rating'] = rating.get_text(strip=True)
 
         # Difficulty
-        difficulty = tree.css_first('.difficulty')
+        difficulty = soup.select_one('.difficulty')
         if difficulty:
-            data['difficulty'] = difficulty.text(strip=True)
+            data['difficulty'] = difficulty.get_text(strip=True)
 
         return data
 
     @staticmethod
-    def _extract_bandcamp(tree: HTMLParser) -> Dict:
+    def _extract_bandcamp(soup: BeautifulSoup) -> Dict:
         """Extract Bandcamp specific data"""
         data = {}
 
         # Track/album title
-        track_title = tree.css_first('.trackTitle, .track_info .title')
+        track_title = soup.select_one('.trackTitle, .track_info .title')
         if track_title:
-            data['track_title'] = track_title.text(strip=True)
+            data['track_title'] = track_title.get_text(strip=True)
 
         # Artist/band name
-        artist_name = tree.css_first('.albumTitle .title, .band-name')
+        artist_name = soup.select_one('.albumTitle .title, .band-name')
         if artist_name:
-            data['artist_name'] = artist_name.text(strip=True)
+            data['artist_name'] = artist_name.get_text(strip=True)
 
         # Album art
-        album_art = tree.css_first('.popupImage img')
+        album_art = soup.select_one('.popupImage img')
         if album_art:
-            data['album_art_url'] = album_art.attributes.get('src', '')
+            data['album_art_url'] = album_art.get('src', '')
 
         # Genre tags
         tags = []
-        for tag in tree.css('.tag'):
-            tag_text = tag.text(strip=True)
+        for tag in soup.select('.tag'):
+            tag_text = tag.get_text(strip=True)
             if tag_text:
                 tags.append(tag_text)
         if tags:
             data['tags'] = tags[:10]  # Limit tags
 
         # Price/release date
-        price = tree.css_first('.price')
+        price = soup.select_one('.price')
         if price:
-            data['price'] = price.text(strip=True)
+            data['price'] = price.get_text(strip=True)
 
         return data
 
     @staticmethod
-    def _extract_lastfm(tree: HTMLParser) -> Dict:
+    def _extract_lastfm(soup: BeautifulSoup) -> Dict:
         """Extract Last.fm specific data"""
         data = {}
 
         # Page type detection
-        if '/artist/' in tree.css_first('link[rel="canonical"]').attributes.get('href', ''):
-            data['page_type'] = 'artist'
-        elif '/album/' in tree.css_first('link[rel="canonical"]').attributes.get('href', ''):
-            data['page_type'] = 'album'
-        elif '/music/' in tree.css_first('link[rel="canonical"]').attributes.get('href', ''):
-            data['page_type'] = 'track'
+        canonical = soup.select_one('link[rel="canonical"]')
+        if canonical:
+            href = canonical.get('href', '')
+            if '/artist/' in href:
+                data['page_type'] = 'artist'
+            elif '/album/' in href:
+                data['page_type'] = 'album'
+            elif '/music/' in href:
+                data['page_type'] = 'track'
 
         # Artist name
-        artist = tree.css_first('.header-new-title, .artist-name')
+        artist = soup.select_one('.header-new-title, .artist-name')
         if artist:
-            data['artist_name'] = artist.text(strip=True)
+            data['artist_name'] = artist.get_text(strip=True)
 
         # Track/album name
-        track_album = tree.css_first('.track-name, .album-name')
+        track_album = soup.select_one('.track-name, .album-name')
         if track_album:
-            data['track_album_name'] = track_album.text(strip=True)
+            data['track_album_name'] = track_album.get_text(strip=True)
 
         # Play count
-        play_count = tree.css_first('.header-new-crumb')
+        play_count = soup.select_one('.header-new-crumb')
         if play_count:
-            data['play_count'] = play_count.text(strip=True)
+            data['play_count'] = play_count.get_text(strip=True)
 
         # Tags
         tags = []
-        for tag in tree.css('.tag'):
-            tag_text = tag.text(strip=True)
+        for tag in soup.select('.tag'):
+            tag_text = tag.get_text(strip=True)
             if tag_text:
                 tags.append(tag_text)
         if tags:
@@ -267,135 +269,135 @@ class ContentExtractor:
         return data
 
     @staticmethod
-    def _extract_discogs(tree: HTMLParser) -> Dict:
+    def _extract_discogs(soup: BeautifulSoup) -> Dict:
         """Extract Discogs specific data"""
         data = {}
 
         # Release title
-        release_title = tree.css_first('.profile-title, h1')
+        release_title = soup.select_one('.profile-title, h1')
         if release_title:
-            data['release_title'] = release_title.text(strip=True)
+            data['release_title'] = release_title.get_text(strip=True)
 
         # Artist
-        artist = tree.css_first('.profile-artist, .artist')
+        artist = soup.select_one('.profile-artist, .artist')
         if artist:
-            data['artist'] = artist.text(strip=True)
+            data['artist'] = artist.get_text(strip=True)
 
         # Year
-        year = tree.css_first('.profile-year')
+        year = soup.select_one('.profile-year')
         if year:
-            data['year'] = year.text(strip=True)
+            data['year'] = year.get_text(strip=True)
 
         # Genre and style
-        genre = tree.css_first('.profile-genre')
+        genre = soup.select_one('.profile-genre')
         if genre:
-            data['genre'] = genre.text(strip=True)
+            data['genre'] = genre.get_text(strip=True)
 
-        style = tree.css_first('.profile-style')
+        style = soup.select_one('.profile-style')
         if style:
-            data['style'] = style.text(strip=True)
+            data['style'] = style.get_text(strip=True)
 
         # Format
-        format_info = tree.css_first('.profile-format')
+        format_info = soup.select_one('.profile-format')
         if format_info:
-            data['format'] = format_info.text(strip=True)
+            data['format'] = format_info.get_text(strip=True)
 
         return data
 
     @staticmethod
-    def _extract_soundcloud(tree: HTMLParser) -> Dict:
+    def _extract_soundcloud(soup: BeautifulSoup) -> Dict:
         """Extract SoundCloud specific data"""
         data = {}
 
         # Track title
-        title = tree.css_first('.soundTitle__title, .sc-title')
+        title = soup.select_one('.soundTitle__title, .sc-title')
         if title:
-            data['track_title'] = title.text(strip=True)
+            data['track_title'] = title.get_text(strip=True)
 
         # Artist/user
-        artist = tree.css_first('.soundTitle__username, .sc-username')
+        artist = soup.select_one('.soundTitle__username, .sc-username')
         if artist:
-            data['artist'] = artist.text(strip=True)
+            data['artist'] = artist.get_text(strip=True)
 
         # Play count
-        play_count = tree.css_first('.sc-ministats-plays')
+        play_count = soup.select_one('.sc-ministats-plays')
         if play_count:
-            data['play_count'] = play_count.text(strip=True)
+            data['play_count'] = play_count.get_text(strip=True)
 
         return data
 
     @staticmethod
-    def _extract_musicbrainz(tree: HTMLParser) -> Dict:
+    def _extract_musicbrainz(soup: BeautifulSoup) -> Dict:
         """Extract MusicBrainz specific data"""
         data = {}
 
         # Entity type from URL or page
-        entity_type = tree.css_first('.entity-type')
+        entity_type = soup.select_one('.entity-type')
         if entity_type:
-            data['entity_type'] = entity_type.text(strip=True)
+            data['entity_type'] = entity_type.get_text(strip=True)
 
         # Name/title
-        name = tree.css_first('.entity-name, h1')
+        name = soup.select_one('.entity-name, h1')
         if name:
-            data['name'] = name.text(strip=True)
+            data['name'] = name.get_text(strip=True)
 
         # MBID
-        mbid = tree.css_first('.mbid')
+        mbid = soup.select_one('.mbid')
         if mbid:
-            data['mbid'] = mbid.text(strip=True)
+            data['mbid'] = mbid.get_text(strip=True)
 
         return data
 
     @staticmethod
-    def _extract_pitchfork(tree: HTMLParser) -> Dict:
+    def _extract_pitchfork(soup: BeautifulSoup) -> Dict:
         """Extract Pitchfork specific data"""
         data = {}
 
         # Review score
-        score = tree.css_first('.score')
+        score = soup.select_one('.score')
         if score:
-            data['review_score'] = score.text(strip=True)
+            data['review_score'] = score.get_text(strip=True)
 
         # Album/artist
-        album = tree.css_first('.single-album-tombstone__title')
+        album = soup.select_one('.single-album-tombstone__title')
         if album:
-            data['album_title'] = album.text(strip=True)
+            data['album_title'] = album.get_text(strip=True)
 
-        artist = tree.css_first('.artist-links')
+        artist = soup.select_one('.artist-links')
         if artist:
-            data['artist'] = artist.text(strip=True)
+            data['artist'] = artist.get_text(strip=True)
 
         return data
 
     @staticmethod
-    def _extract_allmusic(tree: HTMLParser) -> Dict:
+    def _extract_allmusic(soup: BeautifulSoup) -> Dict:
         """Extract AllMusic specific data"""
         data = {}
 
         # Artist/album name
-        name = tree.css_first('.page-title, h1')
+        name = soup.select_one('.page-title, h1')
         if name:
-            data['name'] = name.text(strip=True)
+            data['name'] = name.get_text(strip=True)
 
         # Rating
-        rating = tree.css_first('.rating')
+        rating = soup.select_one('.rating')
         if rating:
-            data['rating'] = rating.text(strip=True)
+            data['rating'] = rating.get_text(strip=True)
 
         # Genre
-        genre = tree.css_first('.genre')
+        genre = soup.select_one('.genre')
         if genre:
-            data['genre'] = genre.text(strip=True)
+            data['genre'] = genre.get_text(strip=True)
 
         return data
 
     @staticmethod
-    def _extract_generic_music(tree: HTMLParser) -> Dict:
+    def _extract_generic_music(soup: BeautifulSoup) -> Dict:
         """Extract generic music-related content"""
         data = {}
 
         # Look for common music-related terms in text
-        text_content = tree.text(strip=True).lower()
+        text_content = soup.get_text(strip=True).lower()
 
         # Count mentions of music terms
         music_terms = [
@@ -413,11 +415,11 @@ class ContentExtractor:
             data['music_term_frequency'] = term_counts
 
         # Extract any JSON-LD music schema
-        json_ld = tree.css('script[type="application/ld+json"]')
+        json_ld = soup.select('script[type="application/ld+json"]')
         for script in json_ld:
             try:
                 import json
-                ld_data = json.loads(script.text())
+                ld_data = json.loads(script.string)
                 if isinstance(ld_data, dict) and ld_data.get('@type') in ['MusicRecording', 'MusicAlbum', 'MusicGroup']:
                     data['schema_org'] = ld_data
                     break
@@ -427,16 +429,16 @@ class ContentExtractor:
         return data
 
     @staticmethod
-    def _extract_structured_data(tree: HTMLParser) -> Dict:
+    def _extract_structured_data(soup: BeautifulSoup) -> Dict:
         """Extract structured data from JSON-LD and microdata"""
         structured_data = {}
 
         # JSON-LD extraction
-        json_ld_scripts = tree.css('script[type="application/ld+json"]')
+        json_ld_scripts = soup.select('script[type="application/ld+json"]')
         for script in json_ld_scripts:
             try:
                 import json
-                data = json.loads(script.text())
+                data = json.loads(script.string)
                 if data:
                     structured_data['json_ld'] = data
                     break
@@ -445,10 +447,10 @@ class ContentExtractor:
 
         # OpenGraph data
         og_data = {}
-        og_tags = tree.css('meta[property^="og:"]')
+        og_tags = soup.select('meta[property^="og:"]')
         for tag in og_tags:
-            property_name = tag.attributes.get('property', '')
-            content = tag.attributes.get('content', '')
+            property_name = tag.get('property', '')
+            content = tag.get('content', '')
             if property_name and content:
                 og_data[property_name] = content
 
@@ -457,10 +459,10 @@ class ContentExtractor:
 
         # Twitter Card data
         twitter_data = {}
-        twitter_tags = tree.css('meta[name^="twitter:"]')
+        twitter_tags = soup.select('meta[name^="twitter:"]')
         for tag in twitter_tags:
-            name = tag.attributes.get('name', '')
-            content = tag.attributes.get('content', '')
+            name = tag.get('name', '')
+            content = tag.get('content', '')
             if name and content:
                 twitter_data[name] = content
 
