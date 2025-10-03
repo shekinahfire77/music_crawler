@@ -27,7 +27,7 @@ python-json-logger==2.0.7
 python-dotenv==1.0.0
 
 # Production server (for health checks)
-gunicorn==21.2.0
+gunicorn==22.0.0
 
 # CSV export
 pandas==2.1.4
