@@ -29,5 +29,5 @@ python-dotenv==1.0.0
 # Production server (for health checks)
 gunicorn==21.2.0
 
-# CSV export
-pandas==2.1.4
+# CSV export - upgraded for Python 3.13 compatibility
+pandas==2.2.3
