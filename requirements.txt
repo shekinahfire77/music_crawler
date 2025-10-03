@@ -6,9 +6,8 @@ aiohttp==3.9.1
 aiofiles==23.2.1
 asyncio==3.4.3
 
-# HTML parsing - using BeautifulSoup4 (Python 3.13 compatible)
-beautifulsoup4==4.12.3
-lxml==5.3.0
+# HTML parsing (lightweight)
+selectolax==0.3.21
 
 # Database and caching
 psycopg2-binary==2.9.9
