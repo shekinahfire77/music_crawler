@@ -2,7 +2,7 @@
 # Resource constraints: 0.5 vCPU, 512MB RAM
 
 # Core dependencies
-aiohttp==3.9.1
+aiohttp==3.12.14
 aiofiles==23.2.1
 asyncio==3.4.3
 
